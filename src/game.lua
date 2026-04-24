@@ -625,23 +625,30 @@ function Game:update(dt)
     return
   end
 
-  if self.fxSys and self.fxSys.update then
-    self.fxSys:update(dt)
-  end
-
   if self.state ~= "playing" then return end
 
   -- Boss spawn is handled deterministically after perk selection via `pendingBoss`.
+
+  -- Focus "bullet time": slow the world noticeably to make parrying easier.
+  -- Important: keep resource drain on real time to avoid exploiting slow-time.
+  local worldDt = dt
+  if self.player and self.player.focusActive then
+    worldDt = dt * 0.55
+  end
+
+  if self.fxSys and self.fxSys.update then
+    self.fxSys:update(worldDt)
+  end
 
   if self.ddaSys and self.ddaSys.update then self.ddaSys:update(dt) end
   if self.resourcesSys and self.resourcesSys.update then self.resourcesSys:update(dt) end
 
   if self.projectilesSys and self.projectilesSys.update then
-    self.projectilesSys:update(dt)
+    self.projectilesSys:update(worldDt)
   end
 
-  if self.spawnRuntime and self.spawnRuntime.update then self.spawnRuntime:update(dt) end
-  if self.enemyRuntime and self.enemyRuntime.update then self.enemyRuntime:update(dt) end
+  if self.spawnRuntime and self.spawnRuntime.update then self.spawnRuntime:update(worldDt) end
+  if self.enemyRuntime and self.enemyRuntime.update then self.enemyRuntime:update(worldDt) end
 end
 
 function Game:updateUiFonts(scale)

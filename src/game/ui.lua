@@ -371,17 +371,38 @@ function UI:draw(scale, ox, oy, ww, wh)
     local comboLine = ("%s  •  %s"):format(streakTxt, bestTxt)
     love.graphics.print(comboLine, rightX - fonts.normal:getWidth(comboLine), yBot)
 
-    -- Short perk effect line below bar (contextual, low-noise)
-    if (g.player.lastPerkTimer or 0) > 0 and (g.player.lastPerkText or "") ~= "" then
-      love.graphics.setColor(0.85, 0.90, 0.96, 0.80)
-      love.graphics.setFont(fonts.normal)
-      love.graphics.print(g.player.lastPerkText, bx, by + barH + math.floor(8 * s))
-    end
-
     -- Parry feedback (centered in game area, native pixels)
     love.graphics.setFont(fonts.big)
     local centerX = ox + gaW * 0.5
     local msgY = oy + gaH - 110 * s
+    local perkActive = (g.player.lastPerkTimer or 0) > 0 and (g.player.lastPerkText or "") ~= ""
+    if perkActive then
+      local t = util.clamp((g.player.lastPerkTimer or 0) / 1.35, 0, 1)
+      local a0 = util.clamp(1 - (t - 0.85) / 0.15, 0, 1) * util.clamp(t / 0.12, 0, 1)
+      local a = 0.95 * a0
+      local msg = g.player.lastPerkText
+      love.graphics.setFont(fonts.normal)
+      local tw = fonts.normal:getWidth(msg)
+      local th = fonts.normal:getHeight()
+      local padX = 14
+      local padY = 8
+      local x = math.floor(centerX - tw * 0.5 + 0.5)
+      local y = math.floor((msgY - 34 * s) + (1 - a0) * 6 + 0.5)
+
+      -- Soft plate + subtle glow to make it feel like an announcement.
+      love.graphics.setColor(0.05, 0.06, 0.10, 0.55 * a)
+      love.graphics.rectangle("fill", x - padX, y - padY, tw + padX * 2, th + padY * 2, 12, 12)
+      love.graphics.setColor(0.55, 0.85, 1.00, 0.22 * a)
+      love.graphics.rectangle("line", x - padX, y - padY, tw + padX * 2, th + padY * 2, 12, 12)
+
+      love.graphics.setColor(0.95, 0.85, 0.35, a)
+      love.graphics.print(msg, x, y)
+      love.graphics.setBlendMode("add")
+      love.graphics.setColor(0.55, 0.85, 1.00, 0.18 * a)
+      love.graphics.print(msg, x, y)
+      love.graphics.setBlendMode("alpha")
+      love.graphics.setFont(fonts.big)
+    end
     if g.player.lastParry.timer > 0 then
       local ok = g.player.lastParry.ok
       local msg = g.player.lastParry.label
