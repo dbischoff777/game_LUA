@@ -81,6 +81,16 @@ function perks.defaultPool()
       end
     }),
     perk({
+      id = "life_leech",
+      rarity = "rare",
+      stackable = true,
+      name = "Life Leech",
+      desc = "Build leech charge on kills + perfects. Heal when it fills.",
+      apply = function(g)
+        g.meta.lifeLeechStacks = (g.meta.lifeLeechStacks or 0) + 1
+      end
+    }),
+    perk({
       id = "shockwave",
       rarity = "epic",
       stackable = false,

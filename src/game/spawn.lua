@@ -38,6 +38,8 @@ function Spawn:resetRun(seed)
     focusRegenBonus = 0,
     focusDrainMult = 1.0,
     overheatDrainMult = 1.0,
+    lifeLeechStacks = 0,
+    lifeLeechCharge = 0,
     shieldUsedThisWave = false
   }
 

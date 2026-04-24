@@ -141,6 +141,10 @@ function Combat:onSuccessfulParry(e, dtFromImpact)
   local g = self.game
   local win = self:currentParryWindowForEnemy(e)
   local perfect = self:addScoreForParry(dtFromImpact, win)
+  if perfect then
+    -- Leech charge from "clean" play (perfects).
+    g:addLifeLeech(0.20)
+  end
   g.player.hasParriedOnce = true
   if perfect then
     g:duckMusic(util.lerp(0.70, 0.50, love.math.random()), 0.15)

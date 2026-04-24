@@ -209,6 +209,9 @@ function Game:killEnemy(e)
   self:spawnEnemyDeathJuice(e)
   e.phase = "done"
 
+  -- Life leech: earn charge on kills (heal when it fills).
+  self:addLifeLeech(0.34)
+
   if e.kind == "goblin" then
     local bonus = 220 + (self.wave or 1) * 35
     local add = self:addScore(bonus)
@@ -299,6 +302,26 @@ function Game:addScore(base)
   local add = math.max(1, math.floor(base * mult + 0.5))
   self.player.score = (self.player.score or 0) + add
   return add
+end
+
+function Game:addLifeLeech(charge)
+  if not (self.player and self.meta) then return end
+  local stacks = tonumber(self.meta.lifeLeechStacks) or 0
+  if stacks <= 0 then return end
+  if (self.player.hp or 0) >= (self.player.maxHp or 0) then return end
+  charge = tonumber(charge) or 0
+  if charge <= 0 then return end
+
+  self.meta.lifeLeechCharge = (self.meta.lifeLeechCharge or 0) + charge * (1.0 + 0.35 * math.max(0, stacks - 1))
+  while (self.meta.lifeLeechCharge or 0) >= 1.0 and (self.player.hp or 0) < (self.player.maxHp or 0) do
+    self.meta.lifeLeechCharge = (self.meta.lifeLeechCharge or 0) - 1.0
+    self.player.hp = math.min(self.player.maxHp, (self.player.hp or 0) + 1)
+    -- Reuse the perk announcement style popup.
+    self.player.lastPerkTimer = math.max(self.player.lastPerkTimer or 0, 0.65)
+    self.player.lastPerkText = "LEECH +1"
+    self:playSfx("blip", 0.60, 1.15)
+    self.flash = math.max(self.flash or 0, 0.06)
+  end
 end
 
 function Game:getEnemySpeedMult()
