@@ -248,10 +248,34 @@ function Combat:attemptParry()
 
   local e, imp = enemy.findNearestImpact(g, g.enemies)
   if not e or not imp then
-    g.player.lastParry.ok = false
-    g.player.lastParry.dt = 999
-    g.player.lastParry.timer = 0
-    g.player.lastParry.label = ""
+    -- Fatigue: pressing parry with no active window is a self-hit (prevents spam-to-win),
+    -- but only when there are actual threats present (enemies/projectiles).
+    local hasThreat = false
+    for _, ee in ipairs(g.enemies or {}) do
+      if ee and ee.phase ~= "done" then
+        hasThreat = true
+        break
+      end
+    end
+    if (not hasThreat) and g.projectiles and #g.projectiles > 0 then
+      hasThreat = true
+    end
+    if hasThreat then
+      g.player.lastParry.ok = false
+      g.player.lastParry.dt = 999
+      g.player.lastParry.timer = 0.70
+      g.player.lastParry.label = "You whiff and hit yourself"
+      g:spawnParticles(g.centerX, g.centerY, { 1.00, 0.25, 0.25 }, 16, 60, 320, 0.22, 0.60, 2, 7)
+      g:spawnRing(g.centerX, g.centerY, { 1.00, 0.25, 0.25 }, 22, 160, 0.22)
+      g.flash = math.max(g.flash, 0.18)
+      g.shake = math.max(g.shake, 0.22)
+      self:playerTakeHit()
+    else
+      g.player.lastParry.ok = false
+      g.player.lastParry.dt = 999
+      g.player.lastParry.timer = 0
+      g.player.lastParry.label = ""
+    end
     return
   end
 
