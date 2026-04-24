@@ -70,7 +70,7 @@ function Combat:addScoreForParry(dtFromImpact, parryWindowUsed)
     bonus = bonus + (g.meta.perfectBonus or 0)
   end
 
-  g.player.score = g.player.score + base + bonus
+  g:addScore(base + bonus)
   return perfect
 end
 
@@ -78,6 +78,13 @@ function Combat:playerTakeHit()
   local g = self.game
   if (g.player.invuln or 0) > 0 then
     return
+  end
+
+  -- Mistakes should hurt the combo, but not fully reset it:
+  -- drop one multiplier tier (based on the game's combo step).
+  local function applyComboPenalty()
+    local step = (g.getComboStep and g:getComboStep()) or 5
+    g.player.streak = math.max(0, (g.player.streak or 0) - step)
   end
 
   if g.meta.streakShield and not g.meta.shieldUsedThisWave then
@@ -102,7 +109,7 @@ function Combat:playerTakeHit()
     g:playSfx("parry", 0.9, 0.92)
     g.player.invuln = 0.35
     g.player.recovery = 1.5
-    g.player.streak = 0
+    applyComboPenalty()
     g.flash = 0.18
     g.shake = 0.22
     g.freeze = 0.05
@@ -114,7 +121,7 @@ function Combat:playerTakeHit()
   g:playSfx("hit", 1.0, 1.0)
   g.player.invuln = 0.18
   g.player.recovery = 1.25
-  g.player.streak = 0
+  applyComboPenalty()
   g.flash = 0.25
   g.shake = 0.25
   g.freeze = 0.05
@@ -241,7 +248,7 @@ function Combat:attemptParry()
       self:onSuccessfulParry({ x = p.x, y = p.y, kind = "projectile" }, 0)
       g.player.lastParry.timer = 0.55
       g.player.lastParry.label = "DEFLECT!"
-      g.player.score = (g.player.score or 0) + 5
+      g:addScore(5)
       return
     end
   end
@@ -380,7 +387,7 @@ function Combat:attemptParry()
         e.timer = 0
         e.impacts = nil
         e.nextImpactIdx = nil
-        g.player.score = (g.player.score or 0) + 15
+        g:addScore(15)
         g.player.lastParry.timer = 0.55
         g.player.lastParry.label = ("GOBLIN (%d)"):format(e.hp or 0)
       end

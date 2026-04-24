@@ -33,6 +33,8 @@ function Assets.loadIcons()
 
   return {
     hero = loadIcon("assets/images/hero.png", 0.10),
+    combometerEmpty = loadImage("assets/images/combometerEmpty.png"),
+    combometerFull = loadImage("assets/images/combometerFull.png"),
     arena = loadImage("assets/images/menu/game/arena.png"),
     enemy = loadIcon("assets/images/basic.png", 0.06),
     basic = loadIcon("assets/images/basic.png", 0.06),

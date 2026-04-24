@@ -1,6 +1,8 @@
 local UI = {}
 UI.__index = UI
 
+UI._comboShader = nil
+
 -- Shared compendium skin cache so the loader can pre-warm it once
 -- and all UI instances reuse it (prevents first-open hitch).
 UI._sharedCompendiumSkin = nil
@@ -290,6 +292,30 @@ function UI:draw(scale, ox, oy, ww, wh)
   local s = scale or 1
   self:updateFonts(s)
 
+  -- Combo meter subtle haze/shimmer (similar spirit to Heat/Focus ring pass).
+  if UI._comboShader == nil and love.graphics and love.graphics.newShader then
+    UI._comboShader = love.graphics.newShader([[
+      extern number u_time;
+      extern number u_amount; // 0..1
+
+      vec4 effect(vec4 color, Image tex, vec2 uv, vec2 px) {
+        // subtle "energy flow" distortion - keep small to avoid UI blur
+        float a = clamp(u_amount, 0.0, 1.0);
+        float wob = sin((uv.y * 26.0) + u_time * 4.0) * 0.0025 * a;
+        float wob2 = sin((uv.x * 18.0) - u_time * 3.1) * 0.0018 * a;
+        vec2 u2 = uv + vec2(wob, wob2);
+
+        vec4 c = Texel(tex, u2) * color;
+
+        // faint moving highlight band
+        float band = 0.5 + 0.5 * sin(u_time * 2.8 + uv.x * 10.0);
+        float boost = smoothstep(0.65, 0.98, band) * 0.10 * a;
+        c.rgb += boost;
+        return c;
+      }
+    ]])
+  end
+
   local fonts = g.uiFonts
   local function vx(x) return ox + x * s end
   local function vy(y) return oy + y * s end
@@ -370,6 +396,117 @@ function UI:draw(scale, ox, oy, ww, wh)
     love.graphics.setColor(0.55, 0.85, 1.00, 0.92)
     local comboLine = ("%s  •  %s"):format(streakTxt, bestTxt)
     love.graphics.print(comboLine, rightX - fonts.normal:getWidth(comboLine), yBot)
+
+    -- Combo multiplier meter (ties streak -> score gain).
+    local mult, prog, _tiers, rank = 1.0, 0.0, 0, nil
+    if g.getComboMult then
+      mult, prog, _tiers, rank = g:getComboMult()
+    end
+    local multTxt = rank and ("%s  x%.2f"):format(rank, mult) or ("x%.2f"):format(mult)
+    local mw = fonts.normal:getWidth(multTxt)
+    local imgEmpty = g.assets and g.assets.combometerEmpty or nil
+    local imgFull = g.assets and g.assets.combometerFull or nil
+    local my = yBot + math.floor(12 * s + 0.5)
+    if imgEmpty and imgFull then
+      local iw, ih = imgEmpty:getWidth(), imgEmpty:getHeight()
+      -- Make it large and readable.
+      local meterH = math.floor(82 * s + 0.5)
+      local sc = meterH / math.max(1, ih)
+      local meterW = math.floor(iw * sc + 0.5)
+      local mx = rightX - math.max(meterW, mw)
+      local cx = mx + meterW * 0.5
+
+      -- Inner track bounds (used for emptying + filling).
+      local insetX = math.floor(iw * 0.10 + 0.5)
+      local insetY = math.floor(ih * 0.36 + 0.5)
+      local innerW = math.max(1, iw - insetX * 2)
+      local innerH = math.max(1, ih - insetY * 2)
+      local p = util.clamp(prog, 0, 1)
+      local sx = mx + insetX * sc
+      local sy = my + insetY * sc
+      local sw = innerW * sc
+      local sh = innerH * sc
+
+      -- Base: truly empty bar.
+      love.graphics.setColor(1, 1, 1, 0.95)
+      love.graphics.draw(imgEmpty, mx, my, 0, sc, sc)
+
+      -- Fill: overlay the "full" art, clipped to progress.
+      local fillW = math.max(0, math.floor(sw * p + 0.5))
+      if fillW > 0 then
+        love.graphics.setScissor(sx, sy, fillW, sh)
+        local pulse = 0.72 + 0.28 * (0.5 + 0.5 * math.sin((g.t or 0) * 9.5))
+        -- Core full bar.
+        local haze = util.clamp((p * p) * (0.55 + 0.45 * pulse), 0, 1)
+        if UI._comboShader then
+          UI._comboShader:send("u_time", g.t or 0)
+          UI._comboShader:send("u_amount", haze)
+          love.graphics.setShader(UI._comboShader)
+        end
+        love.graphics.setColor(1, 1, 1, 0.92 + 0.08 * pulse)
+        love.graphics.draw(imgFull, mx, my, 0, sc, sc)
+        love.graphics.setShader()
+
+        -- Stronger glow + pulse, similar to Heat/Focus layering.
+        love.graphics.setBlendMode("add")
+        local glowA = (0.22 + 0.26 * pulse) * util.clamp(p, 0.15, 1.0)
+        love.graphics.setColor(0.55, 0.90, 1.00, glowA)
+        love.graphics.draw(imgFull, mx - 1, my - 1, 0, sc * 1.02, sc * 1.02)
+        love.graphics.setColor(0.55, 0.90, 1.00, glowA * 0.65)
+        love.graphics.draw(imgFull, mx - 2, my - 2, 0, sc * 1.05, sc * 1.05)
+        love.graphics.setColor(0.55, 0.90, 1.00, glowA * 0.38)
+        love.graphics.draw(imgFull, mx - 3, my - 3, 0, sc * 1.08, sc * 1.08)
+        love.graphics.setBlendMode("alpha")
+        love.graphics.setScissor()
+      end
+
+      -- Centered label under the bar, with a nicer plate + glow.
+      -- Keep it tucked close to the meter.
+      local ty = my + meterH + math.floor(1 * s + 0.5)
+      love.graphics.setFont(fonts.normal)
+      local tw = fonts.normal:getWidth(multTxt)
+      local th = fonts.normal:getHeight()
+      -- Ensure the label never exceeds the meter width.
+      local textScale = math.min(1.0, (meterW - 10) / math.max(1, tw))
+      local tx = math.floor(cx - (tw * textScale) * 0.5 + 0.5)
+
+      -- Animated "style" pulse that scales with fill.
+      local fillAmt = util.clamp(p, 0, 1)
+      local pulse = 0.5 + 0.5 * math.sin((g.t or 0) * (6.0 + 8.0 * fillAmt))
+      local pop = (0.015 + 0.065 * fillAmt) * pulse
+      local labelScale = textScale * (1.0 + pop)
+      local glowA = (0.14 + 0.26 * fillAmt) * (0.65 + 0.35 * pulse)
+
+      love.graphics.setColor(0.05, 0.06, 0.10, 0.48)
+      love.graphics.rectangle("fill", tx - 14, ty - 8, tw * labelScale + 28, th * labelScale + 14, 12, 12)
+      love.graphics.setColor(0.55, 0.85, 1.00, 0.24)
+      love.graphics.rectangle("line", tx - 14, ty - 8, tw * labelScale + 28, th * labelScale + 14, 12, 12)
+
+      love.graphics.setColor(0.90, 0.92, 1.00, 0.90 + 0.08 * fillAmt)
+      love.graphics.print(multTxt, tx, ty, 0, labelScale, labelScale)
+      love.graphics.setBlendMode("add")
+      love.graphics.setColor(0.55, 0.90, 1.00, glowA)
+      love.graphics.print(multTxt, tx, ty, 0, labelScale, labelScale)
+      love.graphics.setBlendMode("alpha")
+      love.graphics.setFont(fonts.normal)
+    else
+      local meterW = math.floor(96 * s + 0.5)
+      local meterH = math.floor(8 * s + 0.5)
+      local mx = rightX - math.max(meterW, mw)
+      love.graphics.setColor(0.08, 0.10, 0.16, 0.62)
+      love.graphics.rectangle("fill", mx, my, meterW, meterH, 6, 6)
+      local fillW = math.max(0, math.floor(meterW * util.clamp(prog, 0, 1) + 0.5))
+      if fillW > 0 then
+        love.graphics.setColor(0.45, 1.00, 0.80, 0.85)
+        love.graphics.rectangle("fill", mx, my, fillW, meterH, 6, 6)
+        love.graphics.setBlendMode("add")
+        love.graphics.setColor(0.55, 0.85, 1.00, 0.22)
+        love.graphics.rectangle("fill", mx, my, fillW, meterH, 6, 6)
+        love.graphics.setBlendMode("alpha")
+      end
+      love.graphics.setColor(0.86, 0.90, 0.96, 0.80)
+      love.graphics.print(multTxt, rightX - mw, my + meterH + math.floor(3 * s + 0.5))
+    end
 
     -- Parry feedback (centered in game area, native pixels)
     love.graphics.setFont(fonts.big)

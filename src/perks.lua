@@ -219,7 +219,7 @@ function perks.fallbackChoices(g, count)
       name = "Loose Change",
       desc = "+50 score",
       apply = function(gg)
-        gg.player.score = (gg.player.score or 0) + 50
+        gg:addScore(50)
       end
     }
   }

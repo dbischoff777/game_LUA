@@ -211,9 +211,9 @@ function Game:killEnemy(e)
 
   if e.kind == "goblin" then
     local bonus = 220 + (self.wave or 1) * 35
-    self.player.score = (self.player.score or 0) + bonus
+    local add = self:addScore(bonus)
     self.player.lastPerkTimer = 1.1
-    self.player.lastPerkText = ("TREASURE +%d"):format(bonus)
+    self.player.lastPerkText = ("TREASURE +%d"):format(add)
     self.flash = math.max(self.flash or 0, 0.10)
     self.shake = math.max(self.shake or 0, 0.12)
   end
@@ -265,6 +265,40 @@ end
 
 function Game:isOverheated()
   return (self.player and self.player.overheatActive) == true
+end
+
+function Game:getComboStep()
+  return 5
+end
+
+function Game:getComboMult()
+  local streak = (self.player and self.player.streak) or 0
+  -- Streak multiplier curve (arcade-style):
+  -- - fast early growth so players feel it quickly
+  -- - diminishing returns via a soft cap to keep leaderboards sane
+  -- Tiers are displayed as a simple rank (HUD), and mistakes reset streak elsewhere.
+  local step = self:getComboStep() -- every N streak = next tier
+  local perStep = 0.10  -- +0.10x per tier
+  local cap = 2.50
+
+  local tiers = math.floor(math.max(0, streak) / step)
+  local mult = math.min(cap, 1.0 + tiers * perStep)
+  local prog = (streak % step) / step
+
+  local ranks = { "D", "C", "B", "A", "S", "SS", "SSS" }
+  local rank = ranks[math.min(#ranks, 1 + math.floor(tiers / 3))] or "D"
+
+  return mult, prog, tiers, rank
+end
+
+function Game:addScore(base)
+  if not self.player then return 0 end
+  base = math.floor(tonumber(base) or 0)
+  if base <= 0 then return 0 end
+  local mult = self:getComboMult()
+  local add = math.max(1, math.floor(base * mult + 0.5))
+  self.player.score = (self.player.score or 0) + add
+  return add
 end
 
 function Game:getEnemySpeedMult()
@@ -478,7 +512,7 @@ function Game:tryShockwave(x, y)
     self.flash = math.max(self.flash, 0.10)
     self.shake = math.max(self.shake, 0.12)
     self.freeze = math.max(self.freeze, 0.02)
-    self.player.score = self.player.score + 5 * killed
+    self:addScore(5 * killed)
     self.killsThisWave = self.killsThisWave + killed
     self:advanceWaveIfNeeded()
   end
