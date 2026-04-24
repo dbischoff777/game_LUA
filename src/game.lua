@@ -590,7 +590,14 @@ function Game:update(dt)
     return
   end
 
-  self.t = self.t + dt
+  -- World clock (drives enemy strike timings + ring shrink).
+  -- When Focus is active, we slow the world clock noticeably.
+  local worldDtForClock = dt
+  if self.state == "playing" and self.player and self.player.focusActive then
+    worldDtForClock = dt * 0.55
+  end
+
+  self.t = self.t + worldDtForClock
   if self.postfx then self.postfx:update(dt) end
 
   if self.audio and self.audio.update then
@@ -631,10 +638,7 @@ function Game:update(dt)
 
   -- Focus "bullet time": slow the world noticeably to make parrying easier.
   -- Important: keep resource drain on real time to avoid exploiting slow-time.
-  local worldDt = dt
-  if self.player and self.player.focusActive then
-    worldDt = dt * 0.55
-  end
+  local worldDt = worldDtForClock
 
   if self.fxSys and self.fxSys.update then
     self.fxSys:update(worldDt)
