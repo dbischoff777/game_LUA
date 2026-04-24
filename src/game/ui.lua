@@ -460,9 +460,9 @@ function UI:draw(scale, ox, oy, ww, wh)
         love.graphics.setScissor()
       end
 
-      -- Centered label under the bar, with a nicer plate + glow.
-      -- Keep it tucked close to the meter.
-      local ty = my + meterH + math.floor(1 * s + 0.5)
+      -- Anchor label to the *inner track* bottom (the PNG has extra padding),
+      -- so the gap stays tight and consistent.
+      local ty = math.floor((sy + sh) + 2 * s + 0.5)
       love.graphics.setFont(fonts.normal)
       local tw = fonts.normal:getWidth(multTxt)
       local th = fonts.normal:getHeight()
@@ -470,22 +470,46 @@ function UI:draw(scale, ox, oy, ww, wh)
       local textScale = math.min(1.0, (meterW - 10) / math.max(1, tw))
       local tx = math.floor(cx - (tw * textScale) * 0.5 + 0.5)
 
-      -- Animated "style" pulse that scales with fill.
       local fillAmt = util.clamp(p, 0, 1)
-      local pulse = 0.5 + 0.5 * math.sin((g.t or 0) * (6.0 + 8.0 * fillAmt))
-      local pop = (0.015 + 0.065 * fillAmt) * pulse
-      local labelScale = textScale * (1.0 + pop)
-      local glowA = (0.14 + 0.26 * fillAmt) * (0.65 + 0.35 * pulse)
+      local tiersNow = _tiers or 0
+      if self._comboLastTiers == nil then
+        self._comboLastTiers = tiersNow
+        self._comboTierPopAt = (g.t or 0)
+      elseif tiersNow ~= self._comboLastTiers then
+        self._comboLastTiers = tiersNow
+        self._comboTierPopAt = (g.t or 0)
+      end
+      local since = (g.t or 0) - (self._comboTierPopAt or 0)
+      local pop = math.exp(-math.max(0, since) * 9.5) -- fast ease-out
+      local labelScale = textScale * (1.0 + 0.12 * pop)
+      local glowA = (0.10 + 0.18 * fillAmt) + 0.20 * pop
+
+      local function rankColor(r)
+        -- cool -> warm -> hot progression
+        if r == "SSS" then return { 1.00, 0.45, 0.20 } end
+        if r == "SS" then return { 1.00, 0.78, 0.35 } end
+        if r == "S" then return { 1.00, 0.95, 0.35 } end
+        if r == "A" then return { 0.55, 1.00, 0.70 } end
+        if r == "B" then return { 0.45, 1.00, 0.90 } end
+        if r == "C" then return { 0.55, 0.90, 1.00 } end
+        return { 0.86, 0.90, 0.96 } -- D / default
+      end
+      local col = rankColor(rank)
 
       love.graphics.setColor(0.05, 0.06, 0.10, 0.48)
       love.graphics.rectangle("fill", tx - 14, ty - 8, tw * labelScale + 28, th * labelScale + 14, 12, 12)
       love.graphics.setColor(0.55, 0.85, 1.00, 0.24)
       love.graphics.rectangle("line", tx - 14, ty - 8, tw * labelScale + 28, th * labelScale + 14, 12, 12)
 
-      love.graphics.setColor(0.90, 0.92, 1.00, 0.90 + 0.08 * fillAmt)
+      love.graphics.setColor(col[1], col[2], col[3], 0.92)
       love.graphics.print(multTxt, tx, ty, 0, labelScale, labelScale)
       love.graphics.setBlendMode("add")
-      love.graphics.setColor(0.55, 0.90, 1.00, glowA)
+      -- Apply the same "energy" feel as the combometer: rank-tinted glow with pulse.
+      local pulse = 0.5 + 0.5 * math.sin((g.t or 0) * 8.8)
+      local ga = glowA * (0.65 + 0.35 * pulse)
+      love.graphics.setColor(col[1], col[2], col[3], ga)
+      love.graphics.print(multTxt, tx, ty, 0, labelScale, labelScale)
+      love.graphics.setColor(0.55, 0.90, 1.00, ga * 0.55)
       love.graphics.print(multTxt, tx, ty, 0, labelScale, labelScale)
       love.graphics.setBlendMode("alpha")
       love.graphics.setFont(fonts.normal)
