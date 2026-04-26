@@ -209,11 +209,20 @@ function Game:killEnemy(e)
   self:spawnEnemyDeathJuice(e)
   e.phase = "done"
 
+  self.foesSlain = (self.foesSlain or 0) + 1
+  if self.mode == "endless" and self.endless then
+    self.endless.foesSinceBoss = (self.endless.foesSinceBoss or 0) + 1
+  end
+
   -- Life leech: earn charge on kills (heal when it fills).
   self:addLifeLeech(0.34)
 
-  -- Rift Guardian kill: advance to the next Rift tier.
-  if e.kind == "boss" and self.mode == "run" then
+  local function isRiftMode()
+    return self.mode ~= "endless"
+  end
+
+  -- Rift Guardian kill: advance to the next tier (Standard/Hardcore/Seeded).
+  if e.kind == "boss" and isRiftMode() then
     self.bossActive = false
     self.bossId = nil
     self.pendingBoss = false
@@ -241,6 +250,18 @@ function Game:killEnemy(e)
 
     self:enterPerkChoice()
     return
+  end
+
+  -- Endless guardian kill: allow future guardian spawns.
+  if e.kind == "boss" and self.mode == "endless" then
+    self.bossActive = false
+    self.bossId = nil
+    if self.endless then
+      self.endless.bossTimer = 0
+      self.endless.nextBossIn = love.math.random(38, 60)
+      self.endless.nextBossKills = love.math.random(45, 75)
+      self.endless.foesSinceBoss = 0
+    end
   end
 
   if e.kind == "goblin" then
@@ -277,7 +298,7 @@ function Game:killEnemy(e)
   end
 
   -- Standard: build rift progress based on enemy danger. When full, spawn guardian.
-  if self.mode == "run" and (not self.bossActive) then
+  if isRiftMode() and (not self.bossActive) then
     local req = math.max(1, tonumber(self.riftRequired) or 18)
     local kind = (e and e.kind) or "basic"
     local danger = ({

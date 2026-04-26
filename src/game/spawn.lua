@@ -151,8 +151,11 @@ function Spawn:resetRun(seed)
   g.endless = {
     bossTimer = 0,
     nextBossIn = 45,
+    nextBossKills = 55,
+    foesSinceBoss = 0,
     bossMinGap = 28
   }
+  g.foesSlain = 0
 
   g.enemies = {}
   g.nextEnemyId = 1
@@ -175,6 +178,8 @@ function Spawn:startGame(mode, seed)
     g.killsToAdvance = 10
     g.endless.bossTimer = 0
     g.endless.nextBossIn = love.math.random(38, 55)
+    g.endless.nextBossKills = love.math.random(45, 75)
+    g.endless.foesSinceBoss = 0
     g.pendingBoss = false
   end
 
