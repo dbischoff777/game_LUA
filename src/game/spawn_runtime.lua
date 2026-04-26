@@ -10,6 +10,12 @@ end
 function SpawnRuntime:update(dt)
   local g = self.game
 
+  -- Standard mode: spawn the Rift Guardian once progress is full.
+  if g.mode == "run" and g.pendingBoss and (not g.bossActive) then
+    g.pendingBoss = false
+    g:spawnBoss()
+  end
+
   g.spawnTimer = (g.spawnTimer or 0) + dt
   if g.spawnTimer >= (g.spawnInterval or 0.85) then
     g.spawnTimer = g.spawnTimer - (g.spawnInterval or 0.85)

@@ -212,6 +212,37 @@ function Game:killEnemy(e)
   -- Life leech: earn charge on kills (heal when it fills).
   self:addLifeLeech(0.34)
 
+  -- Rift Guardian kill: advance to the next Rift tier.
+  if e.kind == "boss" and self.mode == "run" then
+    self.bossActive = false
+    self.bossId = nil
+    self.pendingBoss = false
+
+    self.wave = math.min(9999, (self.wave or 1) + 1)
+    self.riftPoints = 0
+    self.riftRequired = (self.getRiftRequired and self:getRiftRequired(self.wave)) or (100 * 1.25)
+    if self.meta then
+      self.meta.shieldUsedThisWave = false
+    end
+
+    -- Clear arena and give a perk between rifts.
+    self.enemies = {}
+    self.projectiles = {}
+    self.spawnTimer = 0
+    self.spawnInterval = 0.85
+
+    if self.announce then
+      self.announce.timer = 2.0
+      self.announce.text = "GATE SEALED"
+      self.announce.sub = ("Descending: Tier %d"):format(self.wave)
+    end
+    self.flash = math.max(self.flash or 0, 0.12)
+    self.shake = math.max(self.shake or 0, 0.12)
+
+    self:enterPerkChoice()
+    return
+  end
+
   if e.kind == "goblin" then
     local bonus = 220 + (self.wave or 1) * 35
     local add = self:addScore(bonus)
@@ -239,9 +270,44 @@ function Game:killEnemy(e)
     self.settingsSaveCooldown = 2.0
   end
 
-  if self.mode == "endless" or (not self.bossActive) then
+  if self.mode == "endless" then
     self.killsThisWave = (self.killsThisWave or 0) + 1
     self:advanceWaveIfNeeded()
+    return
+  end
+
+  -- Standard: build rift progress based on enemy danger. When full, spawn guardian.
+  if self.mode == "run" and (not self.bossActive) then
+    local req = math.max(1, tonumber(self.riftRequired) or 18)
+    local kind = (e and e.kind) or "basic"
+    local danger = ({
+      basic = 1.0,
+      double = 1.15,
+      feint = 1.20,
+      heavy = 1.35,
+      chain = 1.25,
+      ranged = 1.25,
+      shield = 1.35,
+      goblin = 1.75
+    })[kind] or 1.0
+
+    -- Progress contribution: tuned for ~100 kills per guardian on average.
+    local add = 1.0 * danger
+    self.riftPoints = (self.riftPoints or 0) + add
+
+    if (self.riftPoints or 0) >= req then
+      self.riftPoints = req
+      self.pendingBoss = true
+      -- Stop regular spawns; guardian is next.
+      self.spawnInterval = 999
+      if self.announce then
+        self.announce.timer = 2.0
+        self.announce.text = "RIFT SURGES"
+        self.announce.sub = "A guardian answers your defiance."
+      end
+      self.flash = math.max(self.flash or 0, 0.10)
+      self.shake = math.max(self.shake or 0, 0.10)
+    end
   end
 end
 
@@ -568,12 +634,6 @@ function Game:pickPerk(index)
   self:playSfx("blip", 0.7, 1.0)
   self:grantPerk(c)
   self.state = "playing"
-
-  -- Boss waves spawn deterministically at wave start.
-  if self.pendingBoss then
-    self.pendingBoss = false
-    self:spawnBoss()
-  end
 
   self.flash = math.max(self.flash, 0.10)
   self.shake = math.max(self.shake, 0.08)

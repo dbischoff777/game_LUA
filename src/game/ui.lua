@@ -379,7 +379,17 @@ function UI:draw(scale, ox, oy, ww, wh)
         break
       end
     end
-    local centerTxt = bossHp and ("WAVE %d  •  BOSS %s"):format(g.wave, bossHp) or ("WAVE %d"):format(g.wave)
+    local tier = g.wave or 1
+    local centerTxt
+    if g.mode == "run" then
+      local req = math.max(1, tonumber(g.riftRequired) or 18)
+      local pts = util.clamp((tonumber(g.riftPoints) or 0) / req, 0, 1)
+      local pct = math.floor(pts * 100 + 0.5)
+      local label = bossHp and ("HELLGATE %d  •  GUARDIAN %s"):format(tier, bossHp) or ("HELLGATE %d  •  %d%%"):format(tier, pct)
+      centerTxt = label
+    else
+      centerTxt = bossHp and ("WAVE %d  •  BOSS %s"):format(tier, bossHp) or ("WAVE %d"):format(tier)
+    end
     love.graphics.setFont(fonts.big)
     love.graphics.setColor(0.95, 0.85, 0.35, 0.95)
     love.graphics.print(centerTxt, bx + bw * 0.5 - fonts.big:getWidth(centerTxt) * 0.5, by + math.floor(10 * s))
@@ -588,7 +598,7 @@ function UI:draw(scale, ox, oy, ww, wh)
 
     love.graphics.setFont(fonts.title)
     love.graphics.setColor(1, 1, 1)
-    local title = ("WAVE %d COMPLETE"):format(g.wave - 1)
+    local title = (g.mode == "run") and ("HELLGATE %d SEALED"):format((g.wave or 1) - 1) or ("WAVE %d COMPLETE"):format(g.wave - 1)
     love.graphics.print(title, ox + gaW * 0.5 - fonts.title:getWidth(title) * 0.5, vy(120))
 
     love.graphics.setFont(fonts.normal)

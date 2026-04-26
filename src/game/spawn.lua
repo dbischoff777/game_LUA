@@ -72,7 +72,75 @@ function Spawn:resetRun(seed)
   g.player.focusActive = false
   g.projectiles = {}
 
-  g.wave = 1
+  -- Standard mode uses a Diablo-style Rift progression (0..100%) instead of discrete waves.
+  g.wave = 1 -- treated as Rift tier for scaling
+  g.riftPoints = 0
+  local function expectedDangerForTier(tier)
+    tier = math.max(1, tonumber(tier) or 1)
+    local danger = {
+      basic = 1.0,
+      double = 1.15,
+      feint = 1.20,
+      heavy = 1.35,
+      chain = 1.25,
+      ranged = 1.25,
+      shield = 1.35,
+      goblin = 1.75
+    }
+
+    -- goblin chance preempts everything else
+    local pGob = (tier >= 3) and util.clamp(0.03 + (tier - 3) * 0.002, 0.03, 0.06) or 0
+
+    local function wavg(kinds, weights)
+      local s = 0
+      for _, w in ipairs(weights) do s = s + w end
+      if s <= 0 then return danger.basic end
+      local acc = 0
+      for i = 1, #kinds do
+        local k = kinds[i]
+        local w = weights[i] / s
+        acc = acc + w * (danger[k] or 1.0)
+      end
+      return acc
+    end
+
+    local baseAvg
+    if tier < 2 then
+      baseAvg = danger.basic
+    elseif tier < 4 then
+      baseAvg = wavg({ "basic", "double" }, { 0.75, 0.25 })
+    elseif tier < 6 then
+      baseAvg = wavg({ "basic", "double", "shield" }, { 0.60, 0.25, 0.15 })
+    else
+      -- ranged has a flat 1/3 chance
+      local pR = 1 / 3
+      local restAvg
+      if tier < 7 then
+        restAvg = wavg({ "basic", "double", "feint", "shield" }, { 0.48, 0.24, 0.16, 0.12 })
+      elseif tier < 10 then
+        restAvg = wavg({ "basic", "double", "feint", "heavy", "chain", "shield" }, { 0.30, 0.20, 0.16, 0.14, 0.12, 0.08 })
+      else
+        restAvg = wavg({ "basic", "double", "feint", "heavy", "chain", "shield" }, { 0.26, 0.18, 0.14, 0.12, 0.22, 0.08 })
+      end
+      baseAvg = pR * danger.ranged + (1 - pR) * restAvg
+    end
+
+    return pGob * danger.goblin + (1 - pGob) * baseAvg
+  end
+
+  -- Dynamic required: tuned to target ~100 kills per guardian given current spawn weights.
+  g.getRiftRequired = function(_g, tier)
+    tier = math.max(1, tonumber(tier) or 1)
+    local targetKills = 100
+    local avg = expectedDangerForTier(tier)
+    -- Small tier scaling so very high tiers don't become trivial due to faster kill rates.
+    local scale = 1.0 + util.clamp((tier - 1) / 9999, 0, 1) * 0.12
+    return math.floor(targetKills * avg * scale + 0.5)
+  end
+
+  g.riftRequired = g:getRiftRequired(g.wave)
+
+  -- Endless still uses the old wave-ish auto-perk cadence.
   g.killsThisWave = 0
   g.killsToAdvance = 6
   g.spawnTimer = 0
@@ -234,16 +302,13 @@ function Spawn:spawnBoss()
 
   if g.announce then
     g.announce.timer = 2.0
-    g.announce.text = "BOSS WAVE"
-    g.announce.sub = ("Defeat the boss: %d parries"):format(e.hp or 1)
+    g.announce.text = "RIFT GUARDIAN"
+    g.announce.sub = ("Seal the gate: %d parries"):format(e.hp or 1)
   end
   g.flash = math.max(g.flash, 0.12)
   g.shake = math.max(g.shake, 0.18)
 
-  if g.mode ~= "endless" then
-    g.killsThisWave = 0
-    g.killsToAdvance = 1
-  end
+  -- In Standard, guardian spawn is driven by rift progress, not kill quotas.
 end
 
 function Spawn:enterPerkChoice()
@@ -261,6 +326,7 @@ end
 
 function Spawn:advanceWaveIfNeeded()
   local g = self.game
+  if g.mode ~= "endless" then return end
   if g.killsThisWave >= g.killsToAdvance then
     g.wave = g.wave + 1
     g.killsThisWave = 0
