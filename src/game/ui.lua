@@ -678,6 +678,7 @@ function UI:drawHowTo(ww, wh)
     { txt = "If timed right, the shot reflects back and kills the shooter." },
     { txt = "" },
     { icon = "heat", txt = "HEAT (orange): parries and perfect parries fill Heat. When full, enemies get buffed while Heat drains back to 0—then the cycle repeats." },
+    { txt = "" },
     { icon = "focus", txt = ("FOCUS (blue): hold %s to widen your parry window for clutch saves."):format(focusKey) },
     { txt = "" },
     { txt = "Tip: Keybinds lets you rebind controls." }
@@ -946,6 +947,7 @@ function UI:drawCompendium(ww, wh)
       { txt = "If timed right, the shot reflects back and kills the shooter." },
       { txt = "" },
       { icon = "heat", txt = "HEAT (orange): parries and perfect parries fill Heat. When full, enemies get buffed while Heat drains back to 0—then the cycle repeats." },
+      { txt = "" },
       { icon = "focus", txt = ("FOCUS (blue): hold %s to widen your parry window for clutch saves."):format(focusKey) }
     }
 
