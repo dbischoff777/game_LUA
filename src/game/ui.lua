@@ -991,9 +991,22 @@ function UI:drawCompendium(ww, wh)
     love.graphics.setColor(0.86, 0.90, 0.96, 0.92)
     local lore = {
       { req = 1, txt = "You are the last sentinel at the edge of the abyss." },
+      { req = 3, txt = "The first scars settle into your grip. The ring answers your breath." },
       { req = 5, txt = "The seal is cracked. Every parry is a prayer etched into steel." },
+      { req = 8, txt = "You learn the tempo of claws, chain, and feint—hell’s alphabet of violence." },
+      { req = 12, txt = "The abyss tests your patience. You return only silence and perfect timing." },
       { req = 20, txt = "Your name was erased from the annals—only the rhythm of battle remembers it." },
-      { req = 60, txt = "Beyond the gate waits the Choir of Ash. You were built to endure it." }
+      { req = 30, txt = "The gates start to recognize you. The air grows heavier when you arrive." },
+      { req = 45, txt = "They send hunters, not fodder. You send them back as sparks and ash." },
+      { req = 60, txt = "Beyond the gate waits the Choir of Ash. You were built to endure it." },
+      { req = 80, txt = "The war becomes a ritual: inhale, pulse, parry—each beat a wound in hell." },
+      { req = 100, txt = "The last stand is no longer a place. It is you." },
+      { req = 150, txt = "You don’t survive by luck now. You survive by law—your own." },
+      { req = 200, txt = "The abyss grows cautious. The attacks come slower, but meaner." },
+      { req = 300, txt = "Your focus can bend time. Your heat can burn through fear." },
+      { req = 500, txt = "You have sealed more gates than most have seen sunsets. The world still stands." },
+      { req = 750, txt = "Even the guardians hesitate. Somewhere, a bell rings for you—then goes quiet." },
+      { req = 999, txt = "At the final number, the abyss does not end. It only learns your name." }
     }
     local locked = "??? (Unlock more lore by gaining levels.)"
     local y = contentY + 52
@@ -1008,8 +1021,14 @@ function UI:drawCompendium(ww, wh)
       end
       y = y + 6
     end
-    love.graphics.setColor(0.55, 0.85, 1.00, 0.35)
-    love.graphics.print("Lore unlocks at Lv 5, 20, 60", contentX, boxY + boxH - 34)
+    do
+      local reqs = {}
+      for i = 1, #lore do
+        reqs[#reqs + 1] = tostring(lore[i].req)
+      end
+      love.graphics.setColor(0.55, 0.85, 1.00, 0.35)
+      love.graphics.print(("Lore unlocks at Lv %s"):format(table.concat(reqs, ", ")), contentX, boxY + boxH - 34)
+    end
   else
     local entries = {
       {
